@@ -45,7 +45,7 @@
     resultsEl.innerHTML = '';
     statusEl.textContent = 'Connexion en cours...';
     try {
-      const resp = await fetch('https://distrib.victor-heinen.workers.dev/', {
+      const resp = await fetch('https://stockdistrib.victor-heinen.workers.dev/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'authorization': token },
         body: JSON.stringify({
