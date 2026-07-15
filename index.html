@@ -3,74 +3,356 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stock du distributeur</title>
+<title>Distributeur</title>
 <style>
-  body { font-family: -apple-system, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 16px; background: #f7f7f5; color: #222; }
-  h1 { font-size: 20px; margin: 0 0 16px; }
-  .row { display: flex; gap: 8px; margin-bottom: 12px; }
-  input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
-  button { padding: 10px 16px; border: 1px solid #333; border-radius: 6px; background: #222; color: white; font-size: 14px; }
-  button:active { opacity: 0.8; }
-  #status { font-size: 13px; color: #666; margin-bottom: 12px; }
-  table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; }
-  td { padding: 10px 12px; border-bottom: 1px solid #eee; font-size: 14px; }
-  td.qty { text-align: right; font-weight: 600; }
-  td.empty { color: #c0392b; }
-  td.full { color: #27ae60; }
-  .savebar { font-size: 12px; color: #999; margin-top: 16px; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    margin: 0; padding: 0; background: #f2f2f7; color: #1c1c1e;
+  }
+  .wrap { max-width: 480px; margin: 0 auto; padding: 20px 16px 40px; }
+
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  h1 { font-size: 28px; font-weight: 700; margin: 0; letter-spacing: -0.02em; }
+  .icon-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(120,120,128,0.12); border: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; color: #1c1c1e; cursor: pointer;
+  }
+  .icon-btn:active { background: rgba(120,120,128,0.24); }
+
+  .segmented {
+    display: flex; background: rgba(120,120,128,0.12); border-radius: 10px;
+    padding: 2px; margin-bottom: 16px;
+  }
+  .segmented button {
+    flex: 1; border: none; background: transparent; padding: 8px 0;
+    font-size: 14px; font-weight: 600; color: #636366; border-radius: 8px; cursor: pointer;
+  }
+  .segmented button.active { background: #ffffff; color: #1c1c1e; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+
+  .card { background: #ffffff; border-radius: 18px; padding: 18px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+
+  .summary-top { display: flex; align-items: center; gap: 18px; }
+  .ring-wrap { position: relative; width: 84px; height: 84px; flex-shrink: 0; }
+  .ring-wrap svg { transform: rotate(-90deg); width: 84px; height: 84px; }
+  .ring-bg { fill: none; stroke: #f2f2f7; stroke-width: 10; }
+  .ring-fg { fill: none; stroke: #34c759; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 0.6s ease; }
+  .ring-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; }
+
+  .summary-text { flex: 1; }
+  .summary-text .big { font-size: 22px; font-weight: 700; margin: 0 0 2px; }
+  .summary-text .sub { font-size: 13px; color: #8e8e93; margin: 0; }
+
+  .missing-row { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; padding-top: 14px; border-top: 0.5px solid #e5e5ea; }
+  .missing-row .label { font-size: 14px; color: #636366; }
+  .missing-row .value { font-size: 17px; font-weight: 700; color: #ff3b30; }
+
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .stat-card { background: #ffffff; border-radius: 16px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+  .stat-card .label { font-size: 12px; color: #8e8e93; margin: 0 0 4px; }
+  .stat-card .value { font-size: 20px; font-weight: 700; margin: 0; }
+
+  .section-title { font-size: 13px; font-weight: 600; color: #8e8e93; text-transform: uppercase; letter-spacing: 0.03em; margin: 22px 4px 8px; }
+
+  .prod-card { padding: 0; overflow: hidden; }
+  .prod-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 0.5px solid #e5e5ea; }
+  .prod-row:last-child { border-bottom: none; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot.full { background: #34c759; }
+  .dot.mid { background: #ff9f0a; }
+  .dot.empty { background: #ff3b30; }
+  .prod-info { flex: 1; min-width: 0; }
+  .prod-name { font-size: 15px; font-weight: 500; margin: 0 0 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .prod-bar-bg { height: 5px; background: #e5e5ea; border-radius: 3px; overflow: hidden; }
+  .prod-bar-fg { height: 100%; border-radius: 3px; background: #34c759; }
+  .prod-qty { font-size: 13px; color: #8e8e93; font-weight: 600; min-width: 42px; text-align: right; }
+  .prod-amount { font-size: 15px; font-weight: 600; min-width: 56px; text-align: right; }
+
+  .period-row { display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; padding-bottom: 2px; }
+  .period-row button {
+    white-space: nowrap; border: none; background: #ffffff; padding: 8px 14px;
+    border-radius: 20px; font-size: 13px; font-weight: 600; color: #636366;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04); cursor: pointer;
+  }
+  .period-row button.active { background: #007aff; color: #ffffff; }
+
+  .status { text-align: center; font-size: 13px; color: #8e8e93; margin: 10px 0 16px; }
+  .refresh-btn { width: 100%; padding: 14px; border: none; border-radius: 14px; background: #007aff; color: white; font-size: 16px; font-weight: 600; cursor: pointer; }
+  .refresh-btn:active { opacity: 0.8; }
+
+  .settings-panel { display: none; margin-bottom: 14px; }
+  .settings-panel.open { display: block; }
+  .settings-panel input { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid #d1d1d6; font-size: 14px; margin-bottom: 8px; }
+  .settings-panel .hint { font-size: 12px; color: #8e8e93; margin: 0; }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: #8e8e93; font-size: 14px; }
+  .view { display: none; }
+  .view.active { display: block; }
 </style>
 </head>
 <body>
-  <h1>Stock du distributeur</h1>
-  <div class="row">
-    <input id="token" type="text" placeholder="Collez votre token ici" value="04E59FF09289F07CBBCF9815408DF7E6">
+<div class="wrap">
+  <header>
+    <h1>Distributeur</h1>
+    <button class="icon-btn" id="settingsToggle" aria-label="Paramètres">⚙</button>
+  </header>
+
+  <div class="settings-panel" id="settingsPanel">
+    <div class="card">
+      <input id="token" type="text" placeholder="Collez votre token ici">
+      <p class="hint">Le token est mémorisé sur cet appareil. À remplacer si l'app affiche une erreur de connexion.</p>
+    </div>
   </div>
-  <div class="row">
-    <button id="loadBtn" style="width:100%;">Charger le stock</button>
+
+  <div class="segmented">
+    <button class="active" data-tab="stock">Stock</button>
+    <button data-tab="sales">Ventes</button>
   </div>
-  <div id="status"></div>
-  <div id="results"></div>
-  <p class="savebar">Le token est mémorisé sur cet appareil pour la prochaine fois.</p>
+
+  <div class="view active" id="view-stock">
+    <div class="card" id="summaryCard" style="display:none;">
+      <div class="summary-top">
+        <div class="ring-wrap">
+          <svg viewBox="0 0 84 84">
+            <circle class="ring-bg" cx="42" cy="42" r="37"></circle>
+            <circle class="ring-fg" id="ringFg" cx="42" cy="42" r="37" stroke-dasharray="232.5" stroke-dashoffset="232.5"></circle>
+          </svg>
+          <div class="ring-label" id="ringLabel">–</div>
+        </div>
+        <div class="summary-text">
+          <p class="big" id="totalStock">–</p>
+          <p class="sub">capacité totale de la machine</p>
+        </div>
+      </div>
+      <div class="missing-row">
+        <span class="label">Manque pour être plein</span>
+        <span class="value" id="missingValue">–</span>
+      </div>
+    </div>
+
+    <div class="status" id="statusStock">Chargement...</div>
+
+    <div class="section-title">Produits</div>
+    <div class="card prod-card" id="prodList"></div>
+
+    <div style="height:16px;"></div>
+    <button class="refresh-btn" id="refreshStockBtn">Actualiser</button>
+  </div>
+
+  <div class="view" id="view-sales">
+    <div class="period-row">
+      <button class="active" data-period="today">Aujourd'hui</button>
+      <button data-period="7d">7 jours</button>
+      <button data-period="30d">30 jours</button>
+      <button data-period="month">Ce mois</button>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <p class="label">Chiffre d'affaires</p>
+        <p class="value" id="salesRevenue">–</p>
+      </div>
+      <div class="stat-card">
+        <p class="label">Unités vendues</p>
+        <p class="value" id="salesUnits">–</p>
+      </div>
+    </div>
+
+    <div class="status" id="statusSales">Chargement...</div>
+
+    <div class="section-title">Meilleures ventes</div>
+    <div class="card prod-card" id="salesList"></div>
+
+    <div style="height:16px;"></div>
+    <button class="refresh-btn" id="refreshSalesBtn">Actualiser</button>
+  </div>
+</div>
 
 <script>
-  const tokenInput = document.getElementById('token');
-  const saved = localStorage.getItem('xy_token');
-  if (saved) tokenInput.value = saved;
+  const RELAY_STOCK = 'https://stockdistrib.victor-heinen.workers.dev/stock';
+  const RELAY_SALES = 'https://stockdistrib.victor-heinen.workers.dev/sales';
 
-  document.getElementById('loadBtn').addEventListener('click', async function() {
+  const tokenInput = document.getElementById('token');
+  const settingsPanel = document.getElementById('settingsPanel');
+  const settingsToggle = document.getElementById('settingsToggle');
+
+  const savedToken = localStorage.getItem('xy_token') || '';
+  tokenInput.value = savedToken;
+  if (!savedToken) settingsPanel.classList.add('open');
+
+  settingsToggle.addEventListener('click', function() {
+    settingsPanel.classList.toggle('open');
+  });
+
+  document.querySelectorAll('.segmented button').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.segmented button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.getElementById('view-' + btn.dataset.tab).classList.add('active');
+      if (btn.dataset.tab === 'sales' && !document.getElementById('salesList').dataset.loaded) {
+        loadSales();
+      }
+    });
+  });
+
+  // ---------- STOCK ----------
+  const statusStock = document.getElementById('statusStock');
+  const summaryCard = document.getElementById('summaryCard');
+  const prodList = document.getElementById('prodList');
+  const ringFg = document.getElementById('ringFg');
+  const ringLabel = document.getElementById('ringLabel');
+  const totalStock = document.getElementById('totalStock');
+  const missingValue = document.getElementById('missingValue');
+
+  async function loadStock() {
     const token = tokenInput.value.trim();
+    if (!token) { statusStock.textContent = 'Ajoutez votre token dans les paramètres.'; settingsPanel.classList.add('open'); return; }
     localStorage.setItem('xy_token', token);
-    const statusEl = document.getElementById('status');
-    const resultsEl = document.getElementById('results');
-    resultsEl.innerHTML = '';
-    statusEl.textContent = 'Connexion en cours...';
+    statusStock.textContent = 'Chargement...';
     try {
-      const resp = await fetch('https://stockdistrib.victor-heinen.workers.dev/', {
+      const resp = await fetch(RELAY_STOCK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'authorization': token },
+        body: JSON.stringify({ orderBy: 'jqbh asc', pageNum: 1, pageSize: 50, bhmc: '', xldw: '', spmc: '', shbh: '', language: 'fr', channel: '1' })
+      });
+      const data = await resp.json();
+      if (data.code !== 'H0000') {
+        statusStock.textContent = 'Erreur (code ' + data.code + '). Mettez le token à jour.';
+        settingsPanel.classList.add('open');
+        summaryCard.style.display = 'none';
+        prodList.innerHTML = '';
+        return;
+      }
+      renderStock(data.data.list);
+      statusStock.textContent = 'Mis à jour à ' + new Date().toLocaleTimeString('fr-FR');
+    } catch (err) {
+      statusStock.textContent = 'Échec de connexion : ' + err.message;
+    }
+  }
+
+  function renderStock(items) {
+    let cap = 0, cur = 0;
+    items.forEach(it => { cap += it.kcrl || 0; cur += it.kcsl || 0; });
+    const missing = cap - cur;
+    const pct = cap > 0 ? Math.round((cur / cap) * 100) : 0;
+
+    summaryCard.style.display = 'block';
+    totalStock.textContent = cur + ' / ' + cap + ' unités';
+    missingValue.textContent = missing + ' unité' + (missing !== 1 ? 's' : '');
+
+    const circumference = 232.5;
+    ringFg.style.strokeDashoffset = circumference - (pct / 100) * circumference;
+    ringFg.style.stroke = pct >= 60 ? '#34c759' : (pct >= 25 ? '#ff9f0a' : '#ff3b30');
+    ringLabel.textContent = pct + '%';
+
+    if (items.length === 0) { prodList.innerHTML = '<div class="empty-state">Aucun produit trouvé.</div>'; return; }
+
+    const sorted = [...items].sort((a, b) => (a.kcsl / (a.kcrl || 1)) - (b.kcsl / (b.kcrl || 1)));
+    let html = '';
+    sorted.forEach(it => {
+      const ratio = it.kcrl > 0 ? it.kcsl / it.kcrl : 0;
+      const dotClass = ratio === 0 ? 'empty' : (ratio < 1 ? 'mid' : 'full');
+      const barColor = ratio === 0 ? '#ff3b30' : (ratio < 1 ? '#ff9f0a' : '#34c759');
+      html += '<div class="prod-row"><span class="dot ' + dotClass + '"></span>' +
+        '<div class="prod-info"><p class="prod-name">' + it.spmc + '</p>' +
+        '<div class="prod-bar-bg"><div class="prod-bar-fg" style="width:' + (ratio * 100) + '%; background:' + barColor + ';"></div></div></div>' +
+        '<span class="prod-qty">' + it.kcsl + '/' + it.kcrl + '</span></div>';
+    });
+    prodList.innerHTML = html;
+  }
+
+  document.getElementById('refreshStockBtn').addEventListener('click', loadStock);
+
+  // ---------- SALES ----------
+  const statusSales = document.getElementById('statusSales');
+  const salesRevenue = document.getElementById('salesRevenue');
+  const salesUnits = document.getElementById('salesUnits');
+  const salesList = document.getElementById('salesList');
+  let currentPeriod = 'today';
+
+  function fmtDate(d) {
+    const pad = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+  }
+
+  function getRange(period) {
+    const now = new Date();
+    const end = new Date(now);
+    let start = new Date(now);
+    if (period === 'today') {
+      start.setHours(0, 0, 0, 0);
+    } else if (period === '7d') {
+      start.setDate(start.getDate() - 7);
+    } else if (period === '30d') {
+      start.setDate(start.getDate() - 30);
+    } else if (period === 'month') {
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+    return { start: fmtDate(start), end: fmtDate(end) };
+  }
+
+  document.querySelectorAll('.period-row button').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.period-row button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentPeriod = btn.dataset.period;
+      loadSales();
+    });
+  });
+
+  async function loadSales() {
+    const token = tokenInput.value.trim();
+    if (!token) { statusSales.textContent = 'Ajoutez votre token dans les paramètres.'; settingsPanel.classList.add('open'); return; }
+    statusSales.textContent = 'Chargement...';
+    const { start, end } = getRange(currentPeriod);
+    try {
+      const resp = await fetch(RELAY_SALES, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'authorization': token },
         body: JSON.stringify({
-          orderBy: 'jqbh asc', pageNum: 1, pageSize: 20,
-          bhmc: '', xldw: '', spmc: '', shbh: '', language: 'fr', channel: '1'
+          orderBy: 'chje desc', userid: '', jqbh: '', pageNum: 1, pageSize: 50,
+          spmc: '', spbh: '', shmc: '', channel: '1', dwid: '', language: 'fr',
+          status: 0, starttime: start, endtime: end
         })
       });
       const data = await resp.json();
       if (data.code !== 'H0000') {
-        statusEl.textContent = 'Erreur du serveur (code ' + data.code + '). Le token a peut-être expiré, récupérez-en un nouveau depuis le site.';
+        statusSales.textContent = 'Erreur (code ' + data.code + '). Mettez le token à jour.';
+        settingsPanel.classList.add('open');
+        salesList.innerHTML = '';
         return;
       }
-      const items = data.data.list;
-      statusEl.textContent = items.length + ' produits — mis à jour à ' + new Date().toLocaleTimeString('fr-FR');
-      let html = '<table>';
-      items.forEach(function(it) {
-        const cls = it.kcsl === 0 ? 'empty' : (it.kcsl === it.kcrl ? 'full' : '');
-        html += '<tr><td>' + it.spmc + '</td><td class="qty ' + cls + '">' + it.kcsl + ' / ' + it.kcrl + '</td></tr>';
-      });
-      html += '</table>';
-      resultsEl.innerHTML = html;
+      renderSales(data.data);
+      salesList.dataset.loaded = '1';
+      statusSales.textContent = 'Mis à jour à ' + new Date().toLocaleTimeString('fr-FR');
     } catch (err) {
-      statusEl.textContent = 'Échec de connexion : ' + err.message;
+      statusSales.textContent = 'Échec de connexion : ' + err.message;
     }
-  });
+  }
+
+  function renderSales(payload) {
+    const total = payload.ztotal || {};
+    salesRevenue.textContent = (total.chje || 0).toFixed(2) + ' €';
+    salesUnits.textContent = (total.chsl || 0);
+
+    const items = payload.data || [];
+    if (items.length === 0) { salesList.innerHTML = '<div class="empty-state">Aucune vente sur cette période.</div>'; return; }
+
+    let html = '';
+    items.forEach(it => {
+      html += '<div class="prod-row"><div class="prod-info"><p class="prod-name">' + it.spmc + '</p>' +
+        '<p style="font-size:12px;color:#8e8e93;margin:0;">' + (it.xlzb || '') + ' des ventes · ' + it.chsl + ' vendu' + (it.chsl !== 1 ? 's' : '') + '</p></div>' +
+        '<span class="prod-amount">' + (it.chje || 0).toFixed(2) + ' €</span></div>';
+    });
+    salesList.innerHTML = html;
+  }
+
+  document.getElementById('refreshSalesBtn').addEventListener('click', loadSales);
+
+  if (savedToken) loadStock();
 </script>
 </body>
 </html>
