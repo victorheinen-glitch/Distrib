@@ -147,6 +147,16 @@
       <button data-period="7d">7 jours</button>
       <button data-period="30d">30 jours</button>
       <button data-period="month">Ce mois</button>
+      <button data-period="custom">Personnalisé</button>
+    </div>
+
+    <div class="card" id="customDatePanel" style="display:none; padding:14px 16px;">
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input type="date" id="customStart" style="flex:1; padding:10px; border-radius:10px; border:1px solid #d1d1d6; font-size:14px;">
+        <span style="color:#8e8e93; font-size:13px;">au</span>
+        <input type="date" id="customEnd" style="flex:1; padding:10px; border-radius:10px; border:1px solid #d1d1d6; font-size:14px;">
+      </div>
+      <button id="applyCustomBtn" style="width:100%; margin-top:10px; padding:10px; border:none; border-radius:10px; background:#007aff; color:white; font-size:14px; font-weight:600;">Appliquer</button>
     </div>
 
     <div class="stat-grid">
@@ -280,6 +290,11 @@
 
   function getRange(period) {
     const now = new Date();
+    if (period === 'custom') {
+      const s = customStart.value ? new Date(customStart.value + 'T00:00:00') : now;
+      const e = customEnd.value ? new Date(customEnd.value + 'T23:59:59') : now;
+      return { start: fmtDate(s), end: fmtDate(e) };
+    }
     const end = new Date(now);
     let start = new Date(now);
     if (period === 'today') {
@@ -294,14 +309,30 @@
     return { start: fmtDate(start), end: fmtDate(end) };
   }
 
+  const customDatePanel = document.getElementById('customDatePanel');
+  const customStart = document.getElementById('customStart');
+  const customEnd = document.getElementById('customEnd');
+
   document.querySelectorAll('.period-row button').forEach(btn => {
     btn.addEventListener('click', function() {
       document.querySelectorAll('.period-row button').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentPeriod = btn.dataset.period;
+      if (currentPeriod === 'custom') {
+        customDatePanel.style.display = 'block';
+        if (!customStart.value || !customEnd.value) {
+          const today = new Date().toISOString().slice(0, 10);
+          customStart.value = today;
+          customEnd.value = today;
+        }
+        return;
+      }
+      customDatePanel.style.display = 'none';
       loadSales();
     });
   });
+
+  document.getElementById('applyCustomBtn').addEventListener('click', loadSales);
 
   async function loadSales() {
     const token = tokenInput.value.trim();
