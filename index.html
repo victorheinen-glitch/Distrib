@@ -101,8 +101,7 @@
 
   <div class="settings-panel" id="settingsPanel">
     <div class="card">
-      <input id="token" type="text" placeholder="Collez votre token ici">
-      <p class="hint">Le token est mémorisé sur cet appareil. À remplacer si l'app affiche une erreur de connexion.</p>
+      <p class="hint">La connexion est maintenant automatique — vous n'avez plus rien à saisir ici. ✅</p>
     </div>
   </div>
 
@@ -184,13 +183,8 @@
   const RELAY_STOCK = 'https://stockdistrib.victor-heinen.workers.dev/stock';
   const RELAY_SALES = 'https://stockdistrib.victor-heinen.workers.dev/sales';
 
-  const tokenInput = document.getElementById('token');
   const settingsPanel = document.getElementById('settingsPanel');
   const settingsToggle = document.getElementById('settingsToggle');
-
-  const savedToken = localStorage.getItem('xy_token') || '';
-  tokenInput.value = savedToken;
-  if (!savedToken) settingsPanel.classList.add('open');
 
   settingsToggle.addEventListener('click', function() {
     settingsPanel.classList.toggle('open');
@@ -218,20 +212,16 @@
   const missingValue = document.getElementById('missingValue');
 
   async function loadStock() {
-    const token = tokenInput.value.trim();
-    if (!token) { statusStock.textContent = 'Ajoutez votre token dans les paramètres.'; settingsPanel.classList.add('open'); return; }
-    localStorage.setItem('xy_token', token);
     statusStock.textContent = 'Chargement...';
     try {
       const resp = await fetch(RELAY_STOCK, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'authorization': token },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderBy: 'jqbh asc', pageNum: 1, pageSize: 50, bhmc: '', xldw: '', spmc: '', shbh: '', language: 'fr', channel: '1' })
       });
       const data = await resp.json();
       if (data.code !== 'H0000') {
-        statusStock.textContent = 'Erreur (code ' + data.code + '). Mettez le token à jour.';
-        settingsPanel.classList.add('open');
+        statusStock.textContent = 'Erreur (code ' + data.code + ').';
         summaryCard.style.display = 'none';
         prodList.innerHTML = '';
         return;
@@ -335,14 +325,12 @@
   document.getElementById('applyCustomBtn').addEventListener('click', loadSales);
 
   async function loadSales() {
-    const token = tokenInput.value.trim();
-    if (!token) { statusSales.textContent = 'Ajoutez votre token dans les paramètres.'; settingsPanel.classList.add('open'); return; }
     statusSales.textContent = 'Chargement...';
     const { start, end } = getRange(currentPeriod);
     try {
       const resp = await fetch(RELAY_SALES, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'authorization': token },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orderBy: 'chje desc', userid: '', jqbh: '', pageNum: 1, pageSize: 50,
           spmc: '', spbh: '', shmc: '', channel: '1', dwid: '', language: 'fr',
@@ -351,8 +339,7 @@
       });
       const data = await resp.json();
       if (data.code !== 'H0000') {
-        statusSales.textContent = 'Erreur (code ' + data.code + '). Mettez le token à jour.';
-        settingsPanel.classList.add('open');
+        statusSales.textContent = 'Erreur (code ' + data.code + ').';
         salesList.innerHTML = '';
         return;
       }
@@ -383,7 +370,7 @@
 
   document.getElementById('refreshSalesBtn').addEventListener('click', loadSales);
 
-  if (savedToken) loadStock();
+  loadStock();
 </script>
 </body>
 </html>
