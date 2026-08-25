@@ -444,7 +444,7 @@
       historyTotal.textContent = cumulTotal + ' unités';
 
       if (sessions.length === 0 && !live) {
-        historyList.innerHTML = '<div class="card"><div class="empty-state">Aucun remplissage enregistré pour l\\'instant.</div></div>';
+        historyList.innerHTML = '<div class="card"><div class="empty-state">Aucun remplissage enregistré pour le moment.</div></div>';
       } else {
         let html = '';
         if (live) html += sessionHtml(live, true);
