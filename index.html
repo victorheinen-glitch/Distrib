@@ -28,7 +28,7 @@
   }
   .segmented button {
     flex: 1; border: none; background: transparent; padding: 8px 0;
-    font-size: 14px; font-weight: 600; color: #636366; border-radius: 8px; cursor: pointer;
+    font-size: 13px; font-weight: 600; color: #636366; border-radius: 8px; cursor: pointer;
   }
   .segmented button.active { background: #ffffff; color: #1c1c1e; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
 
@@ -90,6 +90,17 @@
   .empty-state { text-align: center; padding: 40px 20px; color: #8e8e93; font-size: 14px; }
   .view { display: none; }
   .view.active { display: block; }
+
+  /* Historique */
+  .session-card { padding: 0; overflow: hidden; }
+  .session-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: #fafafa; }
+  .session-header .date { font-size: 14px; font-weight: 600; }
+  .session-header .total { font-size: 13px; font-weight: 700; color: #34c759; }
+  .session-header.live .total { color: #007aff; }
+  .session-badge { display: inline-block; font-size: 11px; font-weight: 700; color: #007aff; background: rgba(0,122,255,0.12); border-radius: 6px; padding: 2px 6px; margin-left: 6px; }
+  .session-detail-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-top: 0.5px solid #e5e5ea; }
+  .session-detail-row .name { font-size: 14px; }
+  .session-detail-row .qty { font-size: 14px; font-weight: 700; color: #34c759; }
 </style>
 </head>
 <body>
@@ -108,6 +119,7 @@
   <div class="segmented">
     <button class="active" data-tab="stock">Stock</button>
     <button data-tab="sales">Ventes</button>
+    <button data-tab="history">Historique</button>
   </div>
 
   <div class="view active" id="view-stock">
@@ -177,11 +189,33 @@
     <div style="height:16px;"></div>
     <button class="refresh-btn" id="refreshSalesBtn">Actualiser</button>
   </div>
+
+  <div class="view" id="view-history">
+    <div class="stat-grid">
+      <div class="stat-card">
+        <p class="label">Sessions enregistrées</p>
+        <p class="value" id="historyCount">–</p>
+      </div>
+      <div class="stat-card">
+        <p class="label">Total rempli (cumulé)</p>
+        <p class="value" id="historyTotal">–</p>
+      </div>
+    </div>
+
+    <div class="status" id="statusHistory">Chargement...</div>
+
+    <div class="section-title">Sessions de remplissage</div>
+    <div id="historyList"></div>
+
+    <div style="height:16px;"></div>
+    <button class="refresh-btn" id="refreshHistoryBtn">Actualiser</button>
+  </div>
 </div>
 
 <script>
   const RELAY_STOCK = 'https://stockdistrib.victor-heinen.workers.dev/stock';
   const RELAY_SALES = 'https://stockdistrib.victor-heinen.workers.dev/sales';
+  const RELAY_HISTORY = 'https://stockdistrib.victor-heinen.workers.dev/history';
 
   const settingsPanel = document.getElementById('settingsPanel');
   const settingsToggle = document.getElementById('settingsToggle');
@@ -198,6 +232,9 @@
       document.getElementById('view-' + btn.dataset.tab).classList.add('active');
       if (btn.dataset.tab === 'sales' && !document.getElementById('salesList').dataset.loaded) {
         loadSales();
+      }
+      if (btn.dataset.tab === 'history' && !document.getElementById('historyList').dataset.loaded) {
+        loadHistory();
       }
     });
   });
@@ -369,6 +406,59 @@
   }
 
   document.getElementById('refreshSalesBtn').addEventListener('click', loadSales);
+
+  // ---------- HISTORIQUE ----------
+  const statusHistory = document.getElementById('statusHistory');
+  const historyList = document.getElementById('historyList');
+  const historyCount = document.getElementById('historyCount');
+  const historyTotal = document.getElementById('historyTotal');
+
+  function fmtSessionDate(iso) {
+    const d = new Date(iso);
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) + ' à ' +
+      d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function sessionHtml(session, isLive) {
+    const produitsHtml = session.produits.map(p =>
+      '<div class="session-detail-row"><span class="name">' + p.nom + '</span><span class="qty">+' + p.ajoute + '</span></div>'
+    ).join('');
+    return '<div class="card session-card">' +
+      '<div class="session-header' + (isLive ? ' live' : '') + '">' +
+        '<span class="date">' + fmtSessionDate(session.date) + (isLive ? '<span class="session-badge">en cours</span>' : '') + '</span>' +
+        '<span class="total">+' + session.total + ' unités</span>' +
+      '</div>' + produitsHtml +
+    '</div>';
+  }
+
+  async function loadHistory() {
+    statusHistory.textContent = 'Chargement...';
+    try {
+      const resp = await fetch(RELAY_HISTORY, { method: 'GET' });
+      const data = await resp.json();
+      const sessions = data.history || [];
+      const live = data.sessionEnCours || null;
+
+      historyCount.textContent = sessions.length + (live ? ' + 1 en cours' : '');
+      const cumulTotal = sessions.reduce((s, sess) => s + sess.total, 0) + (live ? live.total : 0);
+      historyTotal.textContent = cumulTotal + ' unités';
+
+      if (sessions.length === 0 && !live) {
+        historyList.innerHTML = '<div class="card"><div class="empty-state">Aucun remplissage enregistré pour l\\'instant.</div></div>';
+      } else {
+        let html = '';
+        if (live) html += sessionHtml(live, true);
+        sessions.forEach(sess => { html += sessionHtml(sess, false); });
+        historyList.innerHTML = html;
+      }
+      historyList.dataset.loaded = '1';
+      statusHistory.textContent = 'Mis à jour à ' + new Date().toLocaleTimeString('fr-FR');
+    } catch (err) {
+      statusHistory.textContent = 'Échec de connexion : ' + err.message;
+    }
+  }
+
+  document.getElementById('refreshHistoryBtn').addEventListener('click', loadHistory);
 
   loadStock();
 </script>
