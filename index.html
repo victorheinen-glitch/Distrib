@@ -101,6 +101,22 @@
   .session-detail-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-top: 0.5px solid #e5e5ea; }
   .session-detail-row .name { font-size: 14px; }
   .session-detail-row .qty { font-size: 14px; font-weight: 700; color: #34c759; }
+
+  /* Température */
+  .sensor-card { padding: 16px; }
+  .sensor-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .sensor-name { font-size: 14px; font-weight: 600; color: #636366; display: flex; align-items: center; gap: 6px; }
+  .sensor-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .sensor-value { font-size: 34px; font-weight: 700; margin: 0 0 10px; }
+  .sensor-value .unit { font-size: 16px; font-weight: 600; color: #8e8e93; }
+  .sensor-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .sensor-grid div { text-align: center; }
+  .sensor-grid .lbl { font-size: 10px; color: #8e8e93; text-transform: uppercase; letter-spacing: 0.03em; }
+  .sensor-grid .val { font-size: 13px; font-weight: 700; margin-top: 2px; }
+  .temp-chart-wrap { padding: 14px 10px 6px; }
+  .temp-legend { display: flex; gap: 16px; justify-content: center; margin-top: 6px; }
+  .temp-legend span { font-size: 12px; color: #636366; display: flex; align-items: center; gap: 5px; }
+  .temp-legend .sw { width: 10px; height: 3px; border-radius: 2px; display: inline-block; }
 </style>
 </head>
 <body>
@@ -120,6 +136,7 @@
     <button class="active" data-tab="stock">Stock</button>
     <button data-tab="sales">Ventes</button>
     <button data-tab="history">Historique</button>
+    <button data-tab="temp">Température</button>
   </div>
 
   <div class="view active" id="view-stock">
@@ -210,12 +227,32 @@
     <div style="height:16px;"></div>
     <button class="refresh-btn" id="refreshHistoryBtn">Actualiser</button>
   </div>
+
+  <div class="view" id="view-temp">
+    <div class="period-row">
+      <button class="active" data-temp-period="1h">Heure</button>
+      <button data-temp-period="all">Jour</button>
+    </div>
+
+    <div class="status" id="statusTemp">Chargement...</div>
+
+    <div id="sensorCards"></div>
+
+    <div class="card temp-chart-wrap">
+      <svg id="tempChart" viewBox="0 0 320 160" style="width:100%; height:auto; display:block;"></svg>
+      <div class="temp-legend" id="tempLegend"></div>
+    </div>
+
+    <div style="height:16px;"></div>
+    <button class="refresh-btn" id="refreshTempBtn">Actualiser</button>
+  </div>
 </div>
 
 <script>
   const RELAY_STOCK = 'https://stockdistrib.victor-heinen.workers.dev/stock';
   const RELAY_SALES = 'https://stockdistrib.victor-heinen.workers.dev/sales';
   const RELAY_HISTORY = 'https://stockdistrib.victor-heinen.workers.dev/history';
+  const RELAY_TEMP = 'https://stockdistrib.victor-heinen.workers.dev/temp';
 
   const settingsPanel = document.getElementById('settingsPanel');
   const settingsToggle = document.getElementById('settingsToggle');
@@ -235,6 +272,9 @@
       }
       if (btn.dataset.tab === 'history' && !document.getElementById('historyList').dataset.loaded) {
         loadHistory();
+      }
+      if (btn.dataset.tab === 'temp' && !document.getElementById('sensorCards').dataset.loaded) {
+        loadTemp();
       }
     });
   });
@@ -459,6 +499,113 @@
   }
 
   document.getElementById('refreshHistoryBtn').addEventListener('click', loadHistory);
+
+  // ---------- TEMPÉRATURE ----------
+  const statusTemp = document.getElementById('statusTemp');
+  const sensorCards = document.getElementById('sensorCards');
+  const tempChart = document.getElementById('tempChart');
+  const tempLegend = document.getElementById('tempLegend');
+  let tempData = null;
+  let tempPeriod = '1h';
+  const SENSOR_COLORS = { '1': '#ffc629', '2': '#ff3b30' };
+
+  function cToF(c) { return c * 9 / 5 + 32; }
+  function fmtTemp(c) { return c.toFixed(1) + ' °C'; }
+
+  document.querySelectorAll('[data-temp-period]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('[data-temp-period]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      tempPeriod = btn.dataset.tempPeriod;
+      if (tempData) renderTempChart();
+    });
+  });
+
+  async function loadTemp() {
+    statusTemp.textContent = 'Chargement...';
+    try {
+      const resp = await fetch(RELAY_TEMP);
+      const data = await resp.json();
+      if (data.error) {
+        statusTemp.textContent = 'Erreur : ' + (data.detail || data.error);
+        return;
+      }
+      tempData = data;
+      renderSensorCards();
+      renderTempChart();
+      sensorCards.dataset.loaded = '1';
+      statusTemp.textContent = 'Mis à jour à ' + new Date().toLocaleTimeString('fr-FR');
+    } catch (err) {
+      statusTemp.textContent = 'Échec de connexion : ' + err.message;
+    }
+  }
+
+  function renderSensorCards() {
+    if (!tempData || !tempData.channels) { sensorCards.innerHTML = '<div class="card"><div class="empty-state">Aucun capteur trouvé.</div></div>'; return; }
+    let html = '';
+    tempData.channels.forEach(ch => {
+      const color = SENSOR_COLORS[ch.number] || '#8e8e93';
+      html += '<div class="card sensor-card">' +
+        '<div class="sensor-top"><span class="sensor-name"><span class="sensor-dot" style="background:' + color + ';"></span>' + (ch.label || ('CH ' + ch.number)) + '</span></div>' +
+        '<p class="sensor-value">' + (ch.value != null ? ch.value.toFixed(1) : '–') + '<span class="unit"> °C</span></p>' +
+        '<div class="sensor-grid">' +
+          '<div><div class="lbl">High</div><div class="val">' + (ch.alarmHigh ? ch.alarmHigh.value : '–') + '°</div></div>' +
+          '<div><div class="lbl">Low</div><div class="val">' + (ch.alarmLow ? ch.alarmLow.value : '–') + '°</div></div>' +
+          '<div><div class="lbl">Max</div><div class="val">' + (ch.maximum && ch.maximum.reading ? ch.maximum.reading.value.toFixed(1) : '–') + '°</div></div>' +
+          '<div><div class="lbl">Min</div><div class="val">' + (ch.minimum && ch.minimum.reading ? ch.minimum.reading.value.toFixed(1) : '–') + '°</div></div>' +
+        '</div></div>';
+    });
+    sensorCards.innerHTML = html;
+  }
+
+  function renderTempChart() {
+    if (!tempData || !tempData.readings) return;
+    const readings = tempData.readings;
+    const now = Date.now();
+    const cutoff = tempPeriod === '1h' ? now - 3600 * 1000 : 0;
+
+    const series = Object.keys(readings).map(num => {
+      const pts = (readings[num] || []).filter(p => p[0] >= cutoff);
+      return { num, pts, color: SENSOR_COLORS[num] || '#8e8e93', label: 'SENSOR ' + num };
+    });
+
+    const allVals = series.flatMap(s => s.pts.map(p => p[1]));
+    if (allVals.length === 0) {
+      tempChart.innerHTML = '<text x="160" y="80" text-anchor="middle" fill="#8e8e93" font-size="10">Pas de données sur cette période</text>';
+      tempLegend.innerHTML = '';
+      return;
+    }
+    const minV = Math.min(...allVals), maxV = Math.max(...allVals);
+    const pad = (maxV - minV) * 0.1 || 1;
+    const yMin = minV - pad, yMax = maxV + pad;
+    const allTs = series.flatMap(s => s.pts.map(p => p[0]));
+    const xMin = Math.min(...allTs), xMax = Math.max(...allTs) || xMin + 1;
+
+    const W = 320, H = 160, PAD = 24;
+    function xScale(t) { return PAD + (t - xMin) / ((xMax - xMin) || 1) * (W - PAD - 6); }
+    function yScale(v) { return (H - 18) - (v - yMin) / ((yMax - yMin) || 1) * (H - 18 - 10); }
+
+    let svg = '<line x1="' + PAD + '" y1="' + (H-18) + '" x2="' + W + '" y2="' + (H-18) + '" stroke="#e5e5ea" stroke-width="1"/>';
+    svg += '<text x="2" y="' + (yScale(yMax)+4) + '" font-size="8" fill="#8e8e93">' + yMax.toFixed(0) + '°</text>';
+    svg += '<text x="2" y="' + (yScale(yMin)+4) + '" font-size="8" fill="#8e8e93">' + yMin.toFixed(0) + '°</text>';
+
+    series.forEach(s => {
+      if (s.pts.length === 0) return;
+      let d = '';
+      s.pts.forEach((p, i) => {
+        const x = xScale(p[0]).toFixed(1), y = yScale(p[1]).toFixed(1);
+        d += (i === 0 ? 'M' : 'L') + x + ',' + y + ' ';
+      });
+      svg += '<path d="' + d + '" fill="none" stroke="' + s.color + '" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>';
+    });
+
+    tempChart.innerHTML = svg;
+    tempLegend.innerHTML = series.map(s =>
+      '<span><span class="sw" style="background:' + s.color + ';"></span>' + s.label + '</span>'
+    ).join('');
+  }
+
+  document.getElementById('refreshTempBtn').addEventListener('click', loadTemp);
 
   loadStock();
 </script>
